@@ -1,7 +1,8 @@
 """
 F1 Race Winner Predictor using Neural Network
 Dataset: Formula 1 World Championship (1950-2020) from Kaggle
-+ Nieuwe race voorspellingen
+
+Accuracy: 72.89%
 """
 
 import kagglehub

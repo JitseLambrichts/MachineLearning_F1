@@ -1,9 +1,9 @@
 """
-F1 Race Winner Predictor using Random Forest
+F1 Race Winner Predictor using Random Forest with Hyperparameters
 Dataset: Formula 1 World Championship (1950-2020) from Kaggle
 + Nieuwe race voorspellingen
 
-Accuracy: 95.78%
+Accuracy: 95.14%
 """
 
 import kagglehub
@@ -11,7 +11,7 @@ from kagglehub import KaggleDatasetAdapter
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, RandomizedSearchCV, TimeSeriesSplit
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 import warnings
 import pickle
@@ -224,21 +224,40 @@ print(f"   - Test set: {len(X_test)} samples")
 print(f"   ⚠️  Test set only containins UPCOMING races!")
 
 # Random Forest Model
-print("\n🌲 Training Random Forest model...")
+print("\n🌲 Training Random Forest model with Hyperparameter Tuning...")
 
-rf_model = RandomForestClassifier(
-    n_estimators=100,
-    max_depth=20,
-    min_samples_split=10,
-    min_samples_leaf=5,
-    max_features='sqrt',
+# Definieer de parameter grid
+param_dist = {
+    'n_estimators': [100, 200, 300, 500],
+    'max_depth': [10, 20, 30, None],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'max_features': ['sqrt', 'log2'],
+    'bootstrap': [True, False]
+}
+
+rf = RandomForestClassifier(random_state=42, class_weight='balanced', n_jobs=-1)
+
+# Gebruik TimeSeriesSplit voor validatie
+tscv = TimeSeriesSplit(n_splits=3)
+
+random_search = RandomizedSearchCV(
+    estimator=rf,
+    param_distributions=param_dist,
+    n_iter=20,
+    cv=tscv,    # <-- Gebruik hier tscv in plaats van een getal
+    verbose=2,
     random_state=42,
     n_jobs=-1,
-    class_weight='balanced'
+    scoring='precision' # Precision is vaak belangrijker voor de winnaar (we willen zeker zijn)
 )
 
-rf_model.fit(X_train, y_train)
-print("✅ Model trained!")
+random_search.fit(X_train, y_train)
+
+print(f"✅ Best parameters found: {random_search.best_params_}")
+
+# Gebruik het beste model
+rf_model = random_search.best_estimator_
 
 # Evaluatie
 y_pred = rf_model.predict(X_test)
@@ -381,6 +400,7 @@ if target_race_id in races['raceId'].values:
             (races['circuitId'] == circuit_id) & 
             (races['raceId'] < target_race_id)
         ]
+        # VERANDERD: 'RaceId' -> 'raceId'
         circuit_results = results[results['raceId'].isin(circuit_races['raceId'])]
         
         # Driver stats op dit circuit
