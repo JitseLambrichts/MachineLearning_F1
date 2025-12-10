@@ -138,7 +138,7 @@ def create_features(races_df, results_df, qualifying_df, driver_standings_df, co
             
             features = {
                 'qualifying_position': qualifying_pos,
-                # Algemene statistieken
+
                 'driver_wins': driver_wins,
                 'driver_podiums': driver_podiums,
                 'driver_total_races': driver_races,
@@ -149,7 +149,7 @@ def create_features(races_df, results_df, qualifying_df, driver_standings_df, co
                 'driver_dnf_count': driver_dnf,
                 'recent_avg_position': recent_avg_pos,
                 'recent_wins': recent_wins,
-                # Circuit-specifieke statistieken
+
                 'driver_circuit_wins': driver_circuit_wins,
                 'driver_circuit_podiums': driver_circuit_podiums,
                 'driver_circuit_races': driver_circuit_races,
@@ -157,15 +157,15 @@ def create_features(races_df, results_df, qualifying_df, driver_standings_df, co
                 'driver_circuit_win_rate': driver_circuit_win_rate,
                 'constructor_circuit_wins': constructor_circuit_wins,
                 'constructor_circuit_podiums': constructor_circuit_podiums,
-                # Constructor algemeen
+
                 'constructor_wins': constructor_wins,
                 'constructor_podiums': constructor_podiums,
                 'constructor_points': constructor_points,
-                # Championship standings
+
                 'championship_position': championship_pos,
                 'championship_points': championship_points,
                 'constructor_championship_pos': constructor_champ_pos,
-                # Target
+
                 'won_race': won_race,
                 'driver_id': driver_id,
                 'race_id': race_id

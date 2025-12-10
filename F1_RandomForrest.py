@@ -183,30 +183,37 @@ df_features = df_features.dropna()
 print(f"   - After cleaning: {len(df_features)} samples")
 
 # ============================================
-# TIJDGEBASEERDE SPLIT
+# TIJDGEBASEERDE SPLIT (80/10/10)
 # ============================================
-print("\n🕐 Timebased train/test split... (80% for training data)")
+print("\n🕐 Timebased train/val/test split... (80% Train, 10% Val, 10% Test)")
 
 # Sorteer op race_id (chronologisch)
 df_features = df_features.sort_values('race_id').reset_index(drop=True)
 
-# Gebruik laatste 20% als test set (meest recente races)
-split_idx = int(len(df_features) * 0.8)
-train_data = df_features.iloc[:split_idx]
-test_data = df_features.iloc[split_idx:]
+# Bereken split indices
+n_total = len(df_features)
+train_end = int(n_total * 0.8)
+val_end = int(n_total * 0.9)
+
+# Maak de splits
+train_data = df_features.iloc[:train_end]
+val_data = df_features.iloc[train_end:val_end]
+test_data = df_features.iloc[val_end:]
 
 # Bepaal cutoff race voor voorspelling
 cutoff_race_id = train_data['race_id'].max()
-prediction_race_id = cutoff_race_id + 1  # Voorspel de VOLGENDE race
+val_cutoff_race_id = val_data['race_id'].max()
+prediction_race_id = val_cutoff_race_id + 1
 
 print(f"   - Training until race_id: {cutoff_race_id}")
+print(f"   - Validation until race_id: {val_cutoff_race_id}")
 print(f"   - Voorspelling until race_id: {prediction_race_id}")
 
 # Toon welke races NIET in training zitten
 test_race_ids = test_data['race_id'].unique()
 test_races_info = races[races['raceId'].isin(test_race_ids)].sort_values('date')
 
-print(f"\n📋 Races NOT included in the trainingsdata ({len(test_races_info)} races):")
+print(f"\n📋 Races in TEST set ({len(test_races_info)} races):")
 print("=" * 60)
 for _, race in test_races_info.iterrows():
     print(f"   Race ID {race['raceId']:4d}: {race['name']:30s} - {race['date']}")
@@ -215,39 +222,80 @@ print("=" * 60)
 # Split features en labels
 X_train = train_data.drop(['won_race', 'driver_id', 'race_id'], axis=1)
 y_train = train_data['won_race']
+
+X_val = val_data.drop(['won_race', 'driver_id', 'race_id'], axis=1)
+y_val = val_data['won_race']
+
 X_test = test_data.drop(['won_race', 'driver_id', 'race_id'], axis=1)
 y_test = test_data['won_race']
 
 print(f"\n📊 Dataset splits:")
-print(f"   - Training set: {len(X_train)} samples")
-print(f"   - Test set: {len(X_test)} samples")
+print(f"   - Training set:   {len(X_train)} samples")
+print(f"   - Validation set: {len(X_val)} samples")
+print(f"   - Test set:       {len(X_test)} samples")
 print(f"   ⚠️  Test set only containins UPCOMING races!")
 
 # Random Forest Model
 print("\n🌲 Training Random Forest model...")
 
-rf_model = RandomForestClassifier(
-    n_estimators=100,
-    max_depth=20,
-    min_samples_split=10,
-    min_samples_leaf=5,
-    max_features='sqrt',
-    random_state=42,
-    n_jobs=-1,
-    class_weight='balanced'
-)
+# We testen een paar combinaties om de beste te vinden
+best_score = 0
+best_params = {}
+rf_model = None
 
-rf_model.fit(X_train, y_train)
-print("✅ Model trained!")
+# Parameters om te proberen
+estimators_list = [50, 100, 200]
+depth_list = [10, 20, None]
 
-# Evaluatie
+print(f"   🔎 Tuning hyperparameters using Validation Set...")
+
+for n in estimators_list:
+    for d in depth_list:
+        # Train een tijdelijk model
+        temp_model = RandomForestClassifier(
+            n_estimators=n,
+            max_depth=d,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            max_features='sqrt',
+            random_state=42,
+            n_jobs=-1,
+            class_weight='balanced'
+        )
+        
+        temp_model.fit(X_train, y_train)
+        
+        # Check hoe goed het werkt op de VALIDATION set
+        val_pred = temp_model.predict(X_val)
+        score = accuracy_score(y_val, val_pred)
+        
+        print(f"   - Trees: {n:3d}, Depth: {str(d):4s} -> Val Acc: {score*100:.2f}%")
+        
+        # Bewaar als dit de beste is
+        if score > best_score:
+            best_score = score
+            best_params = {'n_estimators': n, 'max_depth': d}
+            rf_model = temp_model
+
+print(f"\n✅ Best Model found: Trees={best_params['n_estimators']}, Depth={best_params['max_depth']}")
+print(f"   Validation Score: {best_score*100:.2f}%")
+
+# Evaluatie op Validation Set
+print("\n" + "=" * 60)
+print("MODEL EVALUATION (VALIDATION SET)")
+print("=" * 60)
+val_pred = rf_model.predict(X_val)
+val_accuracy = accuracy_score(y_val, val_pred)
+print(f"\n🎯 Validation Accuracy: {val_accuracy * 100:.2f}%")
+
+# Evaluatie op Test Set
 y_pred = rf_model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
 print("\n" + "=" * 60)
-print("MODEL EVALUATION")
+print("MODEL EVALUATION (TEST SET)")
 print("=" * 60)
-print(f"\n🎯 Accuracy: {accuracy * 100:.2f}%")
+print(f"\n🎯 Test Accuracy: {accuracy * 100:.2f}%")
 
 # Feature Importance
 feature_importance = pd.DataFrame({
@@ -262,7 +310,6 @@ for idx, row in feature_importance.head(5).iterrows():
 # Save model
 with open('f1_model.pkl', 'wb') as f:
     pickle.dump(rf_model, f)
-print("\n💾 Model opgeslagen als 'f1_model.pkl'")
 
 # ============================================
 # VOORSPEL NIEUWE RACE (zonder data leakage)
