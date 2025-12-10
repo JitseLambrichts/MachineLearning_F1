@@ -245,7 +245,7 @@ y_pred = rf_model.predict(X_test)
 accuracy = accuracy_score(y_test, y_pred)
 
 print("\n" + "=" * 60)
-print("MODEL EVALUATIE")
+print("MODEL EVALUATION")
 print("=" * 60)
 print(f"\n🎯 Accuracy: {accuracy * 100:.2f}%")
 
@@ -478,7 +478,7 @@ if target_race_id in races['raceId'].values:
     if len(actual_winner) > 0:
         winner_id = actual_winner.iloc[0]['driverId']
         winner_info = drivers[drivers['driverId'] == winner_id].iloc[0]
-        print(f"\n✅ Werkelijke winnaar: {winner_info['forename']} {winner_info['surname']}")
+        print(f"\n✅ Actual winner: {winner_info['forename']} {winner_info['surname']}")
         print("=" * 60)
     
     for idx, (_, row) in enumerate(predictions.head(10).iterrows(), 1):
